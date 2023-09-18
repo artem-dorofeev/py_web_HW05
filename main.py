@@ -40,10 +40,16 @@ def get_currency(date_of_currency: list):
     return result_dict
 
 
-result = get_list_date(5)
-# print(result)
-res_dict = get_currency(result)
-print(res_dict)
+
+if __name__ == '__main__':
+    result = get_list_date(5)
+    # print(result)
+    res_dict = get_currency(result)
+    print(res_dict)
+
+
+
+
 
 # print(current_date.date())
 # month = str(current_date.month) if current_date.month > 9 else '0' + str(current_date.month)

@@ -1,17 +1,25 @@
-import requests
+import sys
+import platform
 from datetime import datetime, timedelta
+import logging
 
-# current_date = datetime.now()
-link_bank = 'https://api.privatbank.ua/p24api/exchange_rates?date='
+import aiohttp
+import asyncio
 
-def get_list_date(period: int):
+BANK_LINK = 'https://api.privatbank.ua/p24api/exchange_rates?date='
+# date_currency = '18.09.2023'
+USD = "USD"
+EUR = "EUR"
+date_now = datetime.now()
+
+
+
+def get_list_date(day):
     list_date = []
-    c_d = datetime.now()
-    # if period == 0:
-    #     period = 1
-    for i in range(period):
+
+    for i in range(day):
         delta_day = timedelta(days=i)
-        new_date = c_d - delta_day
+        new_date = date_now - delta_day
         day = str(new_date.day) if new_date.day > 9 else '0' + str(new_date.day)
         month = str(new_date.month) if new_date.month > 9 else '0' + str(new_date.month)
         date_of_change = day + '.' + month + '.' + str(new_date.year)
@@ -20,63 +28,64 @@ def get_list_date(period: int):
     return list_date
 
 
-def get_currency(date_of_currency: list):
-    result_dict = {}
-    result = []
-    for i in date_of_currency:
-        l_b_new = link_bank + i
-        response = requests.get(l_b_new)
-        change = response.json()
-        for key, value in change.items():
-            if key == 'exchangeRate':
-                date_dict = {}
-                for item in value:
-                    if item['currency'] == 'EUR' or item['currency'] == 'USD' :
-                        print(f"{i} {item['currency']} Sale: {item['saleRate']} Buy: {item['purchaseRateNB']}")
-                        date_dict.update({i: {item['currency']: {'sale': item['saleRate'], 'buy': item['purchaseRateNB']}}})
-                        # print(date_dict)
-        result_dict.update(date_dict)
 
-    return result_dict
+async def request(url: str):
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    r = await resp.json()
+                    return r
+                logging.error(f"Error status: {resp.status} for {url}")
+                return None
+        except aiohttp.ClientConnectorError as err:
+            logging.error(f"Connection error: {str(err)}")
+            return None
 
 
-
-if __name__ == '__main__':
-    result = get_list_date(5)
-    # print(result)
-    res_dict = get_currency(result)
-    print(res_dict)
+async def get_exchange(date, currency):
+    # result = await request('https://api.privatbank.ua/p24api/pubinfo?json&exchange&coursid=5')
+    result = await request(BANK_LINK + date)
+    if result:
+        temp_info = result['exchangeRate']
+        exc, = list(filter(lambda el: el["currency"] == currency, temp_info))
+        return f'{currency}: buy: {exc["purchaseRate"]}, sale: {exc["saleRate"]}. Date: {date}'
+    return "Failed to retrieve data"
 
 
 
+def main():
+    try:
+        day = sys.argv[1]
+    except IndexError:
+        return "No argument"
+
+    try:
+        d = int(day)
+    except ValueError:
+        return "No numerical value"
+    
+    if d <= 10:
+        list_date = get_list_date(d) 
+    else:
+        return "list period more 10 day"
+
+    curr_USD = ''
+    curr_EUR = ''
+    result = ''
+
+    for item in list_date:
+        if platform.system() == 'Windows':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        temp_USD = asyncio.run(get_exchange(item, USD))
+        curr_USD += "\n" + temp_USD
+        temp_EUR = asyncio.run(get_exchange(item, EUR))
+        curr_EUR += "\n" + temp_EUR
+    result = curr_USD.strip() + "\n" + curr_EUR.strip()
+   
+    return result
 
 
-# print(current_date.date())
-# month = str(current_date.month) if current_date.month > 9 else '0' + str(current_date.month)
-# date_of_change = str(current_date.day) + '.' + month + '.' + str(current_date.year)
-# print(date_of_change)
-# link_bank = 'https://api.privatbank.ua/p24api/exchange_rates?date=' + date_of_change
-# response = requests.get('https://api.privatbank.ua/p24api/exchange_rates?date=03.09.2023')
-# # response = requests.get(link_bank)
-# change = response.json()
 
-
-
-# print(change[date])
-# print(change[exchangeRate])
-
-# for key, value in change.items():
-#     if key == 'exchangeRate':
-#         for i in value:
-#             if i['currency'] == 'EUR' or i['currency'] == 'USD' :
-#                 print(f"{i['currency']} Sale: {i['saleRate']} Buy: {i['purchaseRateNB']}")
-
-            # print(i['currency'])
-        # print(value[1])
-        # print(value[6])
-
-# print(change['exchangeRate'])
-# # response2 = requests.get('https://api.privatbank.ua/p24api/pubinfo?exchange&coursid=5')
-# # change2 = response2.json()
-# print(change2[1])
-
+if __name__ == "__main__":
+    print(main())

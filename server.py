@@ -12,6 +12,8 @@ LINK_BANK = 'https://api.privatbank.ua/p24api/exchange_rates?date='
 date_currency = '18.09.2023'
 currency = "USD"
 
+
+
 async def request(url: str):
     async with aiohttp.ClientSession() as session:
         try:
